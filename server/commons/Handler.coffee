@@ -3,14 +3,35 @@ mongoose = require 'mongoose'
 Grid = require 'gridfs-stream'
 errors = require './errors'
 log = require 'winston'
+config = require '../../server_config'
 Patch = require '../patches/Patch'
 User = require '../users/User'
 sendwithus = require '../sendwithus'
 hipchat = require '../hipchat'
 deltasLib = require '../../app/lib/deltas'
+AWS = require 'aws-sdk'
+AWS.config.update accessKeyId: config.cloudfront.accessKeyId, secretAccessKey: config.cloudfront.secretAccessKey
+cloudFront = new AWS.CloudFront()
 
 PROJECT = {original: 1, name: 1, version: 1, description: 1, slug: 1, kind: 1, created: 1, permissions: 1}
 FETCH_LIMIT = 1000  # So many ThangTypes
+
+clearCloudfrontEntry = (route, slug, cb) ->
+  callerReference = String(Math.random()).replace('.','') #random string that identifies request
+  items = [route]
+  if slug
+    splitRoute = route.split("/")
+    splitRoute[splitRoute.length - 1] = slug
+    items[1] = splitRoute.join("/")
+  params = 
+    DistributionId: config.cloudfront.distributionID
+    InvalidationBatch:
+      CallerReference: callerReference
+      Paths:
+        Quantity: items.length
+        Items: items
+  console.log "Invalidating #{items}"
+  cloudFront.createInvalidation params, (err, data) -> cb err
 
 module.exports = class Handler
   # subclasses should override these properties
@@ -411,6 +432,12 @@ module.exports = class Handler
           @sendSuccess(res, @formatEntity(req, newDocument))
           if @modelClass.schema.is_patchable
             @notifyWatchersOfChange(req.user, newDocument, req.headers['x-current-path'])
+          clearCloudfrontEntry req.path, newDocument.slug, (err) ->
+            unless err
+              console.log "Successfully invalidated CF!"
+            else
+              console.log "CF invalidation failed: #{err}"
+      
 
       if major?
         parentDocument.makeNewMinorVersion(updatedObject, major, done)

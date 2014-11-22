@@ -54,6 +54,11 @@ config.queue =
   secretAccessKey: process.env.COCO_AWS_SECRET_ACCESS_KEY or ''
   region: 'us-east-1'
   simulationQueueName: 'simulationQueue'
+  
+config.cloudfront = 
+  accessKeyId: process.env.COCO_AWS_ACCESS_KEY_ID or ''
+  secretAccessKey: process.env.COCO_AWS_SECRET_ACCESS_KEY or ''
+  distributionID: process.env.COCO_CF_DISTRIBUTION_ID or ''
 
 config.mongoQueue =
   queueDatabaseName: 'coco_queue'
